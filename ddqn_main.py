@@ -98,7 +98,8 @@ if __name__ == "__main__":
     episode = 0
     ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(delayed_env, agent,
                                                                                         augment_state, state_size)
-    total_steps_delay_dependent = int(100000 + config.delay_value * 10000)
+    total_steps_delay_dependent = int(10000 + config.delay_value * 100)
+    #total_steps_delay_dependent = int(100000 + config.delay_value * 10000)
     # eval_done = False
     for step_num in tqdm(range(total_steps_delay_dependent)):
         # if episode % EVAL_FREQ == 0:
