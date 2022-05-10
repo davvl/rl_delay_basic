@@ -50,6 +50,8 @@ def init_main():
             orig_env = gym.make(config.env_name)
     else:
         orig_env = gym.make(config.env_name)
+    print('config.env_name= {}, orig_env={}'.format(config.env_name, orig_env))
+
     # orig_env = DiscretizeActions(orig_env) # for mujoco envs
     delayed_env = DelayedEnv(orig_env, config.delay_value)
     state_size = orig_env.observation_space.shape#[0]
