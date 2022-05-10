@@ -113,6 +113,7 @@ if __name__ == "__main__":
         # else:
         #     for step in range(EP_LEN_LIMIT):
                 #     delayed_env.orig_env.render()
+        delayed_env.render()
         action = agent_act(config, agent, state, delayed_env, eval=False)
         next_state, reward, done, _ = delayed_env.step(action)
         ep_reward += reward
