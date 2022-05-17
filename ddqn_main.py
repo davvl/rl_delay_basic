@@ -46,7 +46,7 @@ def routinely_save_agent(e, env_name):
 
 
 def agent_act(config, agent, state, delayed_env, eval=False):
-    if config.agent_type == 'delayed':
+    if config.agent_type == 'delayed' or config.agent_type == 'rand_delayed':
         action = agent.act(state, pending_actions=delayed_env.get_pending_actions(), eval=eval)
     else:
         action = agent.act(state, eval)
@@ -59,7 +59,7 @@ def massage_state(state, augment_state, delayed_env, state_size):
     return state
 
 if __name__ == "__main__":
-    config, delayed_env, state_size, action_size, done, batch_size = init_main()
+    config, delayed_env, state_size, action_size, done, batch_size, delay = init_main()
 
     score_vec = []
     # for non-atari (i.e. cartpole) env, run on CPU
@@ -84,9 +84,9 @@ if __name__ == "__main__":
     # else:
     augment_state = False
     # wandb.config.update({'augment_state': False}, allow_val_change=True)
-    if config.agent_type == 'delayed':
+    if config.agent_type == 'delayed' or config.agent_type == 'rand_delayed':
         agent = DDQNPlanningAgent(state_size=state_size, env=delayed_env,
-                                  use_learned_forward_model=config.use_learned_forward_model, **kwargs)
+                                  use_learned_forward_model=config.use_learned_forward_model, delay=delay, **kwargs)
     else:
         if config.agent_type == 'augmented':
             # wandb.config.update({'augment_state': True}, allow_val_change=True)
@@ -98,7 +98,8 @@ if __name__ == "__main__":
     episode = 0
     ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(delayed_env, agent,
                                                                                         augment_state, state_size)
-    total_steps_delay_dependent = int(10000 + config.delay_value * 100)
+    total_steps_delay_dependent = int(35000) # + config.delay_value * 1000)
+    #total_steps_delay_dependent = 40
     #total_steps_delay_dependent = int(100000 + config.delay_value * 10000)
     # eval_done = False
     for step_num in tqdm(range(total_steps_delay_dependent)):
@@ -113,7 +114,6 @@ if __name__ == "__main__":
         # else:
         #     for step in range(EP_LEN_LIMIT):
                 #     delayed_env.orig_env.render()
-        delayed_env.render()
         action = agent_act(config, agent, state, delayed_env, eval=False)
         next_state, reward, done, _ = delayed_env.step(action)
         ep_reward += reward

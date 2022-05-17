@@ -10,6 +10,7 @@ from keras import backend as K
 import tensorflow as tf
 import numpy as np
 
+
 def reshape_state(state, is_atari_env, state_size):
     reshaped = state
     if not is_atari_env:
@@ -215,11 +216,12 @@ class DDQNAgent(DQNAgent):
 class DDQNPlanningAgent(DDQNAgent):
     def __init__(self, state_size, action_size, is_atari_env, is_delayed_agent=False, delay_value=0, epsilon_min=0.001,
                  epsilon_decay=0.999, learning_rate=0.001, epsilon=1.0, use_m_step_reward=False,
-                 use_latest_reward=True, env=None, use_learned_forward_model=True):
+                 use_latest_reward=True, env=None, use_learned_forward_model=True, delay=None):
         super().__init__(state_size, action_size, is_atari_env=is_atari_env, is_delayed_agent=is_delayed_agent, delay_value=delay_value,
                          epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, learning_rate=learning_rate,
                          epsilon=epsilon, use_m_step_reward=use_m_step_reward, use_latest_reward=use_latest_reward)
         self.use_learned_forward_model = use_learned_forward_model
+        self.delay = delay
         if self.use_learned_forward_model:
             keras_forward_model = self._build_model(loss='mse', input_size=self.state_size + 1, output_size=self.state_size)
             self.forward_model = ForwardModel(keras_forward_model)
@@ -245,7 +247,17 @@ class DDQNPlanningAgent(DDQNAgent):
             if not self.use_learned_forward_model:
                 self.forward_model.store_initial_state()
                 # initial_state = deepcopy(state)
-            for curr_action in pending_actions:
+            '''for curr_action in pending_actions:
+                last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)
+            '''
+            curr_action = pending_actions[0]
+            for i in range(len(pending_actions)):
+                if self.delay and self.delay.delay_known:
+                    # Use exact action delay model.
+                    curr_action = self.delay.find_executed_action(pending_actions)
+                    pending_actions.popleft()
+                else:
+                    curr_action = pending_actions[i]
                 last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)
             if not self.use_learned_forward_model:
                 self.forward_model.restore_initial_state()

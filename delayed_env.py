@@ -114,9 +114,4 @@ class DelayedEnv:
     def reset_to_state(self, state):
         self.orig_env.unwrapped.state = state
 
-    def render(self):
-        #print(self.env_name)
-        if 'CartPole-v1' in self.env_name:
-            self.render()
-
 #
