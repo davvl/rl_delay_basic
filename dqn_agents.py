@@ -239,7 +239,7 @@ class DDQNPlanningAgent(DDQNAgent):
             loss_dict['f_model_loss'] = f_model_loss
         return loss_dict
 
-    def act(self, state, pending_actions, eval):
+    def act(self, state, executed_actions, pending_actions, eval):
         if not eval and np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         last_state = state
@@ -250,12 +250,19 @@ class DDQNPlanningAgent(DDQNAgent):
             '''for curr_action in pending_actions:
                 last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)
             '''
-            curr_action = pending_actions[0]
             for i in range(len(pending_actions)):
                 if self.delay and self.delay.delay_known:
+                    action_ix = i + self.delay.action_ix
+                    if action_ix < 0:
+                        curr_action = executed_actions[action_ix]
+                    elif action_ix > self.delay_value - 1:
+                        #print(action_ix, pending_actions)
+                        curr_action = pending_actions[-1]
+                    else:
+                        curr_action = pending_actions[action_ix]
                     # Use exact action delay model.
-                    curr_action = self.delay.find_executed_action(pending_actions)
-                    pending_actions.popleft()
+                    #curr_action = self.delay.find_executed_action(executed_actions, pending_actions)
+                    #pending_actions.popleft()
                 else:
                     curr_action = pending_actions[i]
                 last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)

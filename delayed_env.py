@@ -37,6 +37,7 @@ class DelayedEnv:
             else:
                 curr_state = reshape_state(self.get_curr_state(), self.is_atari_env, self.state_size)
                 executed_action = self.trained_non_delayed_agent.act(curr_state)
+
         else:
             executed_action = action
         return self.orig_env.step(executed_action)
@@ -114,4 +115,6 @@ class DelayedEnv:
     def reset_to_state(self, state):
         self.orig_env.unwrapped.state = state
 
+    def get_executed_actions(self):
+        return None
 #

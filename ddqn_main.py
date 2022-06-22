@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import sys
 import numpy as np
 from dqn_agents import DDQNAgent, DDQNPlanningAgent, update_loss, reshape_state
 from init_main import init_main
 import wandb
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from collections import defaultdict
+
 
 import socket
 
@@ -47,7 +51,8 @@ def routinely_save_agent(e, env_name):
 
 def agent_act(config, agent, state, delayed_env, eval=False):
     if config.agent_type == 'delayed' or config.agent_type == 'rand_delayed':
-        action = agent.act(state, pending_actions=delayed_env.get_pending_actions(), eval=eval)
+        action = agent.act(state, executed_actions=delayed_env.get_executed_actions(),
+                           pending_actions=delayed_env.get_pending_actions(), eval=eval)
     else:
         action = agent.act(state, eval)
     return action
@@ -59,7 +64,16 @@ def massage_state(state, augment_state, delayed_env, state_size):
     return state
 
 if __name__ == "__main__":
-    config, delayed_env, state_size, action_size, done, batch_size, delay = init_main()
+    d = defaultdict(list)
+    for k, v in ((k.lstrip('-'), v) for k, v in (a.split('=') for a in sys.argv[1:])):
+        d[k].append(v)
+    for k in (k for k in d if len(d[k]) == 1):
+        d[k] = d[k][0]
+
+    final_avg_scores = []
+    ep_rewards = []
+
+    config, delayed_env, state_size, action_size, done, batch_size, delay = init_main(**d)
 
     score_vec = []
     # for non-atari (i.e. cartpole) env, run on CPU
@@ -85,6 +99,7 @@ if __name__ == "__main__":
     augment_state = False
     # wandb.config.update({'augment_state': False}, allow_val_change=True)
     if config.agent_type == 'delayed' or config.agent_type == 'rand_delayed':
+        print('****** config.use_learned_forward_model={}'.format(config.use_learned_forward_model))
         agent = DDQNPlanningAgent(state_size=state_size, env=delayed_env,
                                   use_learned_forward_model=config.use_learned_forward_model, delay=delay, **kwargs)
     else:
@@ -99,8 +114,7 @@ if __name__ == "__main__":
     ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(delayed_env, agent,
                                                                                         augment_state, state_size)
     total_steps_delay_dependent = int(35000) # + config.delay_value * 1000)
-    #total_steps_delay_dependent = 40
-    #total_steps_delay_dependent = int(100000 + config.delay_value * 10000)
+    total_steps_delay_dependent = config.total_steps
     # eval_done = False
     for step_num in tqdm(range(total_steps_delay_dependent)):
         # if episode % EVAL_FREQ == 0:
@@ -148,3 +162,7 @@ if __name__ == "__main__":
     avg_over = round(tot_ep_num * AVERAGE_OVER_LAST_EP)
     final_avg_score = np.mean(score_vec[-avg_over:])
     wandb.log({'final_score': final_avg_score})
+    final_avg_scores.append(final_avg_score)
+    ep_rewards.append(wandb_dict['reward'])
+    print(ep_rewards)
+
