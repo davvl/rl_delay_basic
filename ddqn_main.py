@@ -24,7 +24,7 @@ AVERAGE_OVER_LAST_EP = 0.1
 # EPISODES = 3500
 SAVE_PATH = 'pretrained_agents'
 EP_LEN_LIMIT = int(1e4)
-EVAL_FREQ = 5
+EVAL_FREQ = 15
 
 
 def init_episode(delayed_env, agent, augment_state, state_size):
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     final_avg_scores = []
     ep_rewards = []
 
-    config, delayed_env, state_size, action_size, done, batch_size, delay = init_main(**d)
+    config, rand_delayed_env, delayed_env, state_size, action_size, done, batch_size = init_main(**d)
 
     score_vec = []
     # for non-atari (i.e. cartpole) env, run on CPU
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     kwargs = {
         'action_size': action_size,
-        'is_atari_env': delayed_env.is_atari_env,
+        'is_atari_env': rand_delayed_env.is_atari_env,
         'is_delayed_agent': config.is_delayed_agent,
         'delay_value': config.delay_value,
         'epsilon_min': config.epsilon_min,
@@ -90,7 +90,8 @@ if __name__ == "__main__":
         'learning_rate': config.learning_rate,
         'epsilon': config.epsilon,
         'use_m_step_reward': config.use_m_step_reward,
-        'use_latest_reward': config.use_latest_reward
+        'use_latest_reward': config.use_latest_reward,
+        'delay_known': config.delay_known
     }
 
     # if not config.double_q:
@@ -100,8 +101,8 @@ if __name__ == "__main__":
     # wandb.config.update({'augment_state': False}, allow_val_change=True)
     if config.agent_type == 'delayed' or config.agent_type == 'rand_delayed':
         print('****** config.use_learned_forward_model={}'.format(config.use_learned_forward_model))
-        agent = DDQNPlanningAgent(state_size=state_size, env=delayed_env,
-                                  use_learned_forward_model=config.use_learned_forward_model, delay=delay, **kwargs)
+        agent = DDQNPlanningAgent(state_size=state_size, env=rand_delayed_env,
+                                  use_learned_forward_model=config.use_learned_forward_model, **kwargs)
     else:
         if config.agent_type == 'augmented':
             # wandb.config.update({'augment_state': True}, allow_val_change=True)
@@ -111,32 +112,36 @@ if __name__ == "__main__":
         agent = DDQNAgent(state_size=state_size, **kwargs)
 
     episode = 0
-    ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(delayed_env, agent,
+    ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(rand_delayed_env, agent,
                                                                                         augment_state, state_size)
     total_steps_delay_dependent = int(35000) # + config.delay_value * 1000)
     total_steps_delay_dependent = config.total_steps
     # eval_done = False
     for step_num in tqdm(range(total_steps_delay_dependent)):
-        # if episode % EVAL_FREQ == 0:
-        #     while not eval_done:
-        #         action = agent_act(config, agent, state, delayed_env, eval=True)
-        #         next_state, eval_reward, eval_done, _ = delayed_env.step(action)
-        #         state = massage_state(next_state, config, delayed_env, state_size)
-        #         ep_reward += eval_reward
-        #     wandb.log({'reward_eval': ep_reward}, step=step_num)
-        #     episode += 1
+        if episode % EVAL_FREQ == 0:
+            eval_done = False
+            while not eval_done:
+                action = agent_act(config, agent, state, delayed_env, eval=True)
+                next_state, eval_reward, eval_done, _ = delayed_env.step(action)
+                state = massage_state(next_state, augment_state, delayed_env, state_size)
+                ep_reward += eval_reward
+            wandb.log({'reward_eval': ep_reward}, step=step_num)
         # else:
         #     for step in range(EP_LEN_LIMIT):
                 #     delayed_env.orig_env.render()
-        action = agent_act(config, agent, state, delayed_env, eval=False)
-        next_state, reward, done, _ = delayed_env.step(action)
+        action = agent_act(config, agent, state, rand_delayed_env, eval=False)
+        next_state, reward, done, info = rand_delayed_env.step(action) # TODO: get the real action executed with delay
         ep_reward += reward
-        if config.use_reward_shaping and not delayed_env.is_atari_env:
-            reward = delayed_env.get_shaped_reward(next_state, reward)
+        if config.use_reward_shaping and not rand_delayed_env.is_atari_env:
+            reward = rand_delayed_env.get_shaped_reward(next_state, reward)
         ep_reshaped_reward += reward
-        next_state = massage_state(next_state, augment_state, delayed_env, state_size)
-        can_memorize = ep_step > config.delay_value or not delayed_env.pretrained_agent_loaded
+        next_state = massage_state(next_state, augment_state, rand_delayed_env, state_size)
+        can_memorize = ep_step > config.delay_value or not rand_delayed_env.pretrained_agent_loaded
         if can_memorize: # otherwise, we're using expert samples initially which is unfair
+            if config.delay_known:
+                action = rand_delayed_env.find_executed_action(rand_delayed_env.get_past_actions(),
+                                                               rand_delayed_env.get_pending_actions(),
+                                                          ix=config.delay_value-1)
             agent.memorize(state, action, reward, next_state, done)
         state = next_state
         if config.double_q and step_num % config.target_network_update_freq == 0:
@@ -155,8 +160,9 @@ if __name__ == "__main__":
             wandb.log(wandb_dict, step=step_num)
             score_vec.append(ep_reward)
             episode += 1
-            ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(delayed_env, agent, augment_state,
-                                                                                       state_size)
+            ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(rand_delayed_env, agent,
+                                                                                                augment_state,
+                                                                                                state_size)
 
     tot_ep_num = len(score_vec)
     avg_over = round(tot_ep_num * AVERAGE_OVER_LAST_EP)

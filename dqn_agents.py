@@ -216,12 +216,14 @@ class DDQNAgent(DQNAgent):
 class DDQNPlanningAgent(DDQNAgent):
     def __init__(self, state_size, action_size, is_atari_env, is_delayed_agent=False, delay_value=0, epsilon_min=0.001,
                  epsilon_decay=0.999, learning_rate=0.001, epsilon=1.0, use_m_step_reward=False,
-                 use_latest_reward=True, env=None, use_learned_forward_model=True, delay=None):
+                 use_latest_reward=True, env=None, use_learned_forward_model=True, delay_known=False):
         super().__init__(state_size, action_size, is_atari_env=is_atari_env, is_delayed_agent=is_delayed_agent, delay_value=delay_value,
                          epsilon_min=epsilon_min, epsilon_decay=epsilon_decay, learning_rate=learning_rate,
                          epsilon=epsilon, use_m_step_reward=use_m_step_reward, use_latest_reward=use_latest_reward)
         self.use_learned_forward_model = use_learned_forward_model
-        self.delay = delay
+        self.delay_known = delay_known
+        if self.delay_known:
+            self.env = env
         if self.use_learned_forward_model:
             keras_forward_model = self._build_model(loss='mse', input_size=self.state_size + 1, output_size=self.state_size)
             self.forward_model = ForwardModel(keras_forward_model)
@@ -247,22 +249,13 @@ class DDQNPlanningAgent(DDQNAgent):
             if not self.use_learned_forward_model:
                 self.forward_model.store_initial_state()
                 # initial_state = deepcopy(state)
-            '''for curr_action in pending_actions:
-                last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)
-            '''
+
             for i in range(len(pending_actions)):
-                if self.delay and self.delay.delay_known:
-                    action_ix = i + self.delay.action_ix
-                    if action_ix < 0:
-                        curr_action = executed_actions[action_ix]
-                    elif action_ix > self.delay_value - 1:
-                        #print(action_ix, pending_actions)
-                        curr_action = pending_actions[-1]
-                    else:
-                        curr_action = pending_actions[action_ix]
+                if self.delay_known:
+                    # Assumes Agent has full knowledge about the environment delay Random Variable
                     # Use exact action delay model.
-                    #curr_action = self.delay.find_executed_action(executed_actions, pending_actions)
-                    #pending_actions.popleft()
+                    curr_action = self.env.find_executed_action(self.env.get_past_actions(),
+                                                                self.env.get_pending_actions(), ix=i, random_walk=False)
                 else:
                     curr_action = pending_actions[i]
                 last_state = self.forward_model.get_next_state(state=last_state, action=curr_action)

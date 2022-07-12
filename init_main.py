@@ -19,7 +19,7 @@ sess = tf.compat.v1.Session(config=config)
 K.set_session(sess)
 
 
-def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='5', seed='1', total_steps='1000', walking_p='0'):
+def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='15', seed='2', total_steps='70000', walking_p='0.05 '):
     hyperparameter_defaults = dict(
         is_delayed_agent=False,
         double_q=True,
@@ -40,7 +40,7 @@ def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='5'
         agent_type=agent_type, #'delayed', 'augmented', 'oblivious', 'rand_delayed'
         action_rand_delay=True,  # True, False
         obs_rand_delay=False,  # True, False
-        delay_known=False,  # True, False
+        delay_known=True,  # True, False
         walking_p=float(walking_p),
         total_steps=int(total_steps),
     )
@@ -48,7 +48,7 @@ def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='5'
     wandb.init(config=hyperparameter_defaults)
     config = wandb.config
 
-    wandb.run.name = config.agent_type + ' ' + str(config.delay_value) + ' walking_p=' + str(config.walking_p) +\
+    wandb.run.name = config.agent_type + ' ' + str(config.delay_value) + ' p=' + str(config.walking_p) +\
                      ' delay_known=' + str(config.delay_known) + ' a=' + str(config.action_rand_delay)
                      #+' o=' + str(config.obs_rand_delay)
     #wandb.run.save()
@@ -64,21 +64,20 @@ def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='5'
     print('config.env_name= {}, orig_env={}'.format(config.env_name, orig_env))
 
     # orig_env = DiscretizeActions(orig_env) # for mujoco envs
-    delay = None
     if config.agent_type == 'rand_delayed':
-        delay = Delay(config.delay_value, action=config.action_rand_delay, obs=config.obs_rand_delay,
-                      delay_known=config.delay_known, p=config.walking_p)
-        delayed_env = RandDelayedEnv(orig_env, config.delay_value, delay)
-    else:
-        delayed_env = DelayedEnv(orig_env, config.delay_value)
+        rand_delayed_env = RandDelayedEnv(orig_env, config.delay_value, action=config.action_rand_delay,
+                                     obs=config.obs_rand_delay, p=config.walking_p)
+
+    # Constant delay environment with m=config.delay_value
+    delayed_env = RandDelayedEnv(orig_env, config.delay_value, p=0)
 
     state_size = orig_env.observation_space.shape#[0]
-    if not delayed_env.is_atari_env:
+    if not rand_delayed_env.is_atari_env:
         state_size = state_size[0]
     action_size = orig_env.action_space.n
     done = False
     batch_size = 32
-    return config, delayed_env, state_size, action_size, done, batch_size, delay
+    return config, rand_delayed_env, delayed_env, state_size, action_size, done, batch_size
 
 
 

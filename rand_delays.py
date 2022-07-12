@@ -19,7 +19,6 @@ class Delay:
         self.orig_delay_value = delay_value
         self.action_ix = 0
         self.p = p
-        self.cnt = 0
 
         if self.action:
             self.action_delay_fn = self.action_delay
