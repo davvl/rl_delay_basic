@@ -15,15 +15,27 @@ class RandDelayedEnv(DelayedEnv):
         self.p = p
         self.obs_up = obs
         self.action_up = action
+        self.action_ix = 0
+        self.waiting_time = 0
+
+    def switch_action_ix(self):
+        if self.action_ix == 0:
+            self.action_ix = -1
+        else:
+            self.action_ix = 0
 
     def action_delay(self, action=None):
-        action_ix = 0
+        self.waiting_time -= 1
+        if self.waiting_time <= 0:
+            return self.action_ix
         rand = np.random.rand()
         if rand < self.p:
-            action_ix = -1
-        elif rand > 1 - self.p:
-            action_ix = 0
-        return action_ix
+            #action_ix = -1
+            self.switch_action_ix()
+            self.waiting_time = 500
+        #elif rand > 1 - self.p:
+        #    action_ix = 0
+        return self.action_ix
 
     def find_executed_action(self, past_actions, pending_actions, ix=0, random_walk=False):
         # Random walk step
