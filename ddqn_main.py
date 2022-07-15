@@ -158,6 +158,9 @@ if __name__ == "__main__":
                 f_model_loss = loss_dict['f_model_loss'] / loss_count
                 wandb_dict['f_model_loss'] = f_model_loss
             wandb.log(wandb_dict, step=step_num)
+            wandb.log({'m_t': rand_delayed_env.m_t}, step=step_num)
+            #wandb.log({'action_ix': rand_delayed_env.action_ix}, step=step_num)
+
             score_vec.append(ep_reward)
             episode += 1
             ep_reward, ep_reshaped_reward, state, loss_dict, loss_count, ep_step = init_episode(rand_delayed_env, agent,

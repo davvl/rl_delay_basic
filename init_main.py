@@ -19,7 +19,8 @@ sess = tf.compat.v1.Session(config=config)
 K.set_session(sess)
 
 
-def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='15', seed='2', total_steps='70000', walking_p='0.05 '):
+def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='5', seed='2', total_steps='70000',
+              walking_p='0', min_waiting_time='100'):
     hyperparameter_defaults = dict(
         is_delayed_agent=False,
         double_q=True,
@@ -43,6 +44,7 @@ def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='15
         delay_known=True,  # True, False
         walking_p=float(walking_p),
         total_steps=int(total_steps),
+        min_waiting_time=int(min_waiting_time),
     )
     # Pass your defaults to wandb.init
     wandb.init(config=hyperparameter_defaults)
@@ -65,8 +67,8 @@ def init_main(agent_type='rand_delayed', env_name='CartPole-v1', delay_value='15
 
     # orig_env = DiscretizeActions(orig_env) # for mujoco envs
     if config.agent_type == 'rand_delayed':
-        rand_delayed_env = RandDelayedEnv(orig_env, config.delay_value, action=config.action_rand_delay,
-                                     obs=config.obs_rand_delay, p=config.walking_p)
+        rand_delayed_env = RandDelayedEnv(orig_env, config.delay_value, min_waiting_time=config.min_waiting_time,
+                                          action=config.action_rand_delay, obs=config.obs_rand_delay, p=config.walking_p)
 
     # Constant delay environment with m=config.delay_value
     delayed_env = RandDelayedEnv(orig_env, config.delay_value, p=0)

@@ -4,10 +4,10 @@ from delayed_env import DelayedEnv
 from dqn_agents import reshape_state
 from rand_delays import Delay
 
-MAX_DELAY_SHIFT=1
+MAX_DELAY_SHIFT = 1
 
 class RandDelayedEnv(DelayedEnv):
-    def __init__(self, orig_env, delay_value, action=False, obs=False, p=0.2):
+    def __init__(self, orig_env, delay_value, action=False, obs=False, p=0.2, min_waiting_time=0):
         super().__init__(orig_env, delay_value)
         self.pending_obs = deque()
         self.past_actions = deque(np.zeros(self.delay_value, dtype=np.uint8))
@@ -17,25 +17,18 @@ class RandDelayedEnv(DelayedEnv):
         self.action_up = action
         self.action_ix = 0
         self.waiting_time = 0
-
-    def switch_action_ix(self):
-        if self.action_ix == 0:
-            self.action_ix = -1
-        else:
-            self.action_ix = 0
+        self.min_waiting_time = min_waiting_time
+        self.m_t = -0
 
     def action_delay(self, action=None):
-        self.waiting_time -= 1
-        if self.waiting_time <= 0:
-            return self.action_ix
-        rand = np.random.rand()
-        if rand < self.p:
-            #action_ix = -1
-            self.switch_action_ix()
-            self.waiting_time = 500
-        #elif rand > 1 - self.p:
-        #    action_ix = 0
-        return self.action_ix
+        self.m_t += np.random.normal(loc=0, scale=self.p)
+        self.m_t = max(-1, min(0, self.m_t))
+        #self.waiting_time -= 1
+        #if self.waiting_time > 0:
+        #    return self.action_ix
+        #self.waiting_time = self.min_waiting_time
+        self.action_ix = round(self.m_t)
+        return 0 #self.action_ix
 
     def find_executed_action(self, past_actions, pending_actions, ix=0, random_walk=False):
         # Random walk step
@@ -50,7 +43,6 @@ class RandDelayedEnv(DelayedEnv):
             if i >= len(self.delay_RV):
                 #print('Warning: i is bigger than len(delay_RV). Add restriction to i values')
                 i = len(self.delay_RV)-1
-            #print(i, self.delay_RV, random_walk)
             eff_range = self.delay_RV[i] + i
             if eff_range <= ix:
                 action_ix = i
